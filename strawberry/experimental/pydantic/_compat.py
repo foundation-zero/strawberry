@@ -7,6 +7,7 @@ from uuid import UUID
 
 import pydantic
 from pydantic import BaseModel
+from pydantic.json_schema import JsonSchemaMode
 from pydantic.version import VERSION as PYDANTIC_VERSION
 
 from strawberry.experimental.pydantic.exceptions import UnsupportedTypeError
@@ -179,9 +180,9 @@ class PydanticV2Compat:
         return new_fields
 
     def get_model_json_schema(
-        self, model: type[BaseModel], by_alias: bool
+        self, model: type[BaseModel], by_alias: bool, mode: JsonSchemaMode
     ) -> dict[str, Any]:
-        return model.model_json_schema(by_alias=by_alias)
+        return model.model_json_schema(by_alias=by_alias, mode=mode)
 
     @cached_property
     def fields_map(self) -> dict[Any, Any]:
