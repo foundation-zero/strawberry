@@ -1,5 +1,6 @@
 import textwrap
 from enum import Enum
+from typing import Annotated, Generic, Optional, TypeAlias, TypeVar, Union
 
 import pydantic
 
@@ -10,7 +11,7 @@ from tests.experimental.pydantic.utils import needs_pydantic_v1
 def test_basic_type_field_list():
     class UserModel(pydantic.BaseModel):
         age: int
-        password: str | None
+        password: Optional[str]
 
     @strawberry.experimental.pydantic.type(UserModel)
     class User:
@@ -49,7 +50,7 @@ def test_basic_type_field_list():
 def test_all_fields():
     class UserModel(pydantic.BaseModel):
         age: int
-        password: str | None
+        password: Optional[str]
 
     @strawberry.experimental.pydantic.type(UserModel, all_fields=True)
     class User:
@@ -87,7 +88,7 @@ def test_all_fields():
 def test_auto_fields():
     class UserModel(pydantic.BaseModel):
         age: int
-        password: str | None
+        password: Optional[str]
         other: float
 
     @strawberry.experimental.pydantic.type(UserModel)
@@ -127,7 +128,7 @@ def test_auto_fields():
 def test_basic_alias_type():
     class UserModel(pydantic.BaseModel):
         age_: int = pydantic.Field(..., alias="age")
-        password: str | None
+        password: Optional[str]
 
     @strawberry.experimental.pydantic.type(UserModel)
     class User:
@@ -327,7 +328,7 @@ def test_basic_type_with_union():
         field_b: int
 
     class User(pydantic.BaseModel):
-        union_field: BranchA | BranchB
+        union_field: Union[BranchA, BranchB]
 
     @strawberry.experimental.pydantic.type(BranchA)
     class BranchAType:
@@ -365,7 +366,7 @@ def test_basic_type_with_union_pydantic_types():
         field_b: int
 
     class User(pydantic.BaseModel):
-        union_field: BranchA | BranchB
+        union_field: Union[BranchA, BranchB]
 
     @strawberry.experimental.pydantic.type(BranchA)
     class BranchAType:
@@ -476,7 +477,7 @@ def test_basic_type_with_interface():
 def test_basic_type_with_optional_and_default():
     class UserModel(pydantic.BaseModel):
         age: int
-        password: str | None = pydantic.Field(default="ABC")
+        password: Optional[str] = pydantic.Field(default="ABC")
 
     @strawberry.experimental.pydantic.type(UserModel, all_fields=True)
     class User:
@@ -526,6 +527,74 @@ def test_basic_type_with_optional_and_default():
     assert not result.errors
     assert result.data["user"]["age"] == 1
     assert result.data["user"]["password"] is None
+
+
+def test_nested_type_with_resolved_generic():
+    A = TypeVar("A")
+
+    class Hobby(pydantic.BaseModel, Generic[A]):
+        name: A
+
+    @strawberry.experimental.pydantic.type(Hobby)
+    class HobbyType(Generic[A]):
+        name: strawberry.auto
+
+    class User(pydantic.BaseModel):
+        hobby: Hobby[str]
+
+    @strawberry.experimental.pydantic.type(User)
+    class UserType:
+        hobby: strawberry.auto
+
+    @strawberry.type
+    class Query:
+        @strawberry.field
+        def user(self) -> UserType:
+            return UserType(hobby=HobbyType(name="Skii"))
+
+    schema = strawberry.Schema(query=Query)
+
+    query = "{ user { hobby { name } } }"
+
+    result = schema.execute_sync(query)
+
+    assert not result.errors
+    assert result.data["user"]["hobby"]["name"] == "Skii"
+
+
+def test_nested_type_with_resolved_field_generic():
+    Count: TypeAlias = Annotated[float, pydantic.Field(ge=0)]
+
+    A = TypeVar("A")
+
+    class Hobby(pydantic.BaseModel, Generic[A]):
+        count: A
+
+    @strawberry.experimental.pydantic.type(Hobby)
+    class HobbyType(Generic[A]):
+        count: strawberry.auto
+
+    class User(pydantic.BaseModel):
+        hobby: Hobby[Count]
+
+    @strawberry.experimental.pydantic.type(User)
+    class UserType:
+        hobby: strawberry.auto
+
+    @strawberry.type
+    class Query:
+        @strawberry.field
+        def user(self) -> UserType:
+            return UserType(hobby=HobbyType(count=2))
+
+    schema = strawberry.Schema(query=Query)
+
+    query = "{ user { hobby { count } } }"
+
+    result = schema.execute_sync(query)
+
+    assert not result.errors
+    assert result.data["user"]["hobby"]["count"] == 2
 
 
 @needs_pydantic_v1

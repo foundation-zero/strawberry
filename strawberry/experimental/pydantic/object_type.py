@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import dataclasses
 import sys
+import types
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -257,7 +258,7 @@ def type(
         cls = dataclasses.make_dataclass(
             cls.__name__,
             [field.to_tuple() for field in all_model_fields],
-            bases=cls.__bases__,
+            bases=types.get_original_bases(cls),
             namespace=namespace,
             **kwargs,  # type: ignore
         )
